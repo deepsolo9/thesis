@@ -1,0 +1,52 @@
+\chapter{Conclusion}
+\label{sec:conclusion}
+
+In this chapter, we are going to conclude our work of this thesis and present a direction for the future work.
+
+\section{Conclusion}
+
+Phase change memory (PCM) is an emerging memory technology with many attractive features. In the near
+future, PCM is expected to become a common component in the memory hierarchy of the computer systems.
+On one hand, PCM could turn out to be a low-cost, more reliable, faster and better alternative to
+flash memory. On the other hand, PCM is also a very promising alternative to the traditional DRAM to
+become the major component of the main memory system.
+
+However, PCM is still in its early stage and we still face some challenges to design algorithms for
+PCM-based memory systems including the high read and write latency compared to DRAM, the limited lifetime
+of the chip and the high energy consumption etc. If we want to make best use of PCM in the existing
+systems, we need to overcome these challenges.
+
+In this thesis, we proposed to study the algorithms redesigning for database systems on phase change memory, particularly
+for indexing technique but in the future we can reconsider the whole technology stack of a traditional database systems.
+In our work, we proposed the \bptree indexing structure to best take advantage of the good features of PCM.
+
+The main design objective of our \bptree indexing is to
+reduce the number of writes and energy consumption while keeping
+the tree construction and search efficient. We developed a predictive model to
+predict the near future data distribution based on the current data and then pre-allocate space for them in the
+PCM memory to reduce the movements caused by node splits and merges.
+We present the details of the model and show some metrics to
+evaluate the performance of the model during the construction process.
+If the metrics indicate that the prediction model is not running in a normal manner,
+we will adjust the model or rebuild the index in the worst case.
+The experiments on PostgreSQL database system showed
+that our \bptree indexing scheme achieves a better performance than the traditional \bplustree and outperforms the state-of-the-art solution proposed in
+\cite{chen2011rethinking}.
+Additionally, our \bptree can be easily implemented in
+existing commercial database systems based on the existing \bplustree structures.
+
+\section{Future Work}
+
+Database system is a very complex system and it consists of many complex subsystems\cite{ramakrishnan2003database,date1983introduction}. 
+Currently we only considered the indexing technique but there are many others we can work on for example the query processing algorithms. 
+
+In the future, we can continue to work on algorithms redesigning for PCM-based database systems. We can gradually move on the the query processing algorithms and buffer management. Since query processing is an important component of the database system, which will influence the overall performance of the whole system greatly, it needs to be redesigned carefully. 
+%After that, I will implement the newly designed algorithms to the PostgreSQL system and finally what I want to do is that I implement both the indexing and query processing techniques into PostgreSQL and it can work efficiently without simulation when the PCM product comes out.
+%Furthermore, our \bptree shows an idea about the indexing structure design for the other non-volatile memory with similar characteristics.
+%In this section, we will briefly show some potential research problems and directions on query processing for PCM-based database systems that can be done in the near future. As we have shown in the previous Section~\ref{sec:technology}, the main design goal for algorithms for PCM-based database systems mainly lies in how to reduce the effect of the slow writes and further reduce the energy consumption and query latency.
+
+In \cite{chen2011rethinking}, Chen, Gibbons and Nath have already done some work on hash joins. First they show the simple hash join, there are two phases, the build phase and the probe phase. In the build phase, the algorithm scans the smaller build relation and build a hash table for this relation. Then in the probe phase, the algorithm scans the larger probe relation. For each probe tuple, it computes the hash code and compare with the hash table to output the join result. The main disadvantage of the simple hash join is that whenever the size of the recode is large or not, it will lead to many cache misses, which can lead to a low performance. Then to solve the cache miss problem, the cache partitioning algorithm is introduced. The major difference is that in the build phase, instead of hashing the whole relation, the algorithm partitioned the two input relations using the same hash function so that every pair of the partitions can fit into the CPU cache. Then in the join phase, for each pair of the partition, the simple hash join algorithm can be used. The cache partitioning algorithm can solve the cache miss problem of the simple hash join. But it introduces a large number of writes which is not suitable for PCM-based database systems. Thus in this paper, the authors propose the virtual partitioning hash join, which is a variant of the cache partitioning method. The basic idea is that instead of physically copying input records into partitions, we perform the partitioning virtually. For each partition in build phase, we remember the record IDs and then in the join phase, we can use the record ID lists to join the records of a pair of partitions in place, thus avoiding the large number of writes in cache partitioning.
+
+In our research, since we want to reduce the writes, we need to reconsider and redesign the operators if necessary, including scan, sort, join etc. Since PCM does not have the ``erase-before-write'' shortage, we do not need to focus on the erase and block writes. Since PCM supports fast random reads, we can work on the page layouts like the algorithms design for SSD to reduce the read latency. For refinement of operators, some of the existing techniques can be used like the ``first index and late materialization'' strategy which can reduce much writes.
+
+Much work can be done for the query processing optimization for PCM-based database systems. In this thesis, we just show a direction and we can continue to work on this topic in the future.

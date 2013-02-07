@@ -1,0 +1,43 @@
+\chapter*{Summary}
+\addcontentsline{toc}{chapter}{Summary}
+
+
+In recent years, non-volatile memory like PCM has
+been considered an attractive
+alternative to flash memory and DRAM. 
+It has promising features, including non-volatile storage,
+byte addressability, fast read and write operations,
+and supports random accesses. Many research scholars are working on designing adaptive systems based on such memory technologies. 
+However, there are also some challenges
+in designing algorithms for this kind of non-volatile-based memory systems,
+such as longer write latency and
+higher energy consumption compared to DRAM.
+In this thesis, we will talk about our redesign of the indexing technique for traditional database systems for them.
+
+We propose a new {\em predictive} \bplustree index, called the \bptree.
+which is tailored for database systems that make use of PCM.
+We know that the relative slow-write is one of the major challenges when designing algorithms for the new systems and thus 
+our trivial target is to avoid the writes as many as possible during the execution of our algorithms. 
+For \bplustree, we find that each time a node is full, we need to split the node and 
+write half of the keys on this node to a new place which is the major source of the more writes during the construction of the tree. 
+Our \bptree can reduce the data movements caused by tree node
+splits and merges that arise from insertions and deletions.
+This is achieved by pre-allocating space on the memory for near future data.
+To ensure the space are allocated where they are needed,
+we propose a novel predictive model
+to ascertain future data distribution based on the current data.
+In addition, as in \cite{chen2011rethinking},
+when keys are inserted into a leaf node,
+they are packed but need not be in sorted order which can also reduce some writes.
+
+We implemented the \bptree
+in PostgreSQL and evaluated it in an emulated environment.
+Since we do not have any PCM product now, we need to simulate the environment in our experiments. 
+We customized the buffer management and calculate the number of writes based on the cache line size. 
+Besides the normal insertion, deletion and search performance, we also did experiments to see how sensitive
+our \bptree is to the changes of the data distribution. 
+Our experimental results show that the \bptree significantly reduces
+the number of writes,
+therefore making it write and energy efficient and suitable for a PCM-like
+hardware environment. For the future work, besides the indexing technique, we can move on to make the query
+processing more friendly to the next generation non-volatile memory.

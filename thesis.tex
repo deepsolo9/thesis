@@ -1,0 +1,114 @@
+\documentclass[12pt]{report}
+\usepackage{amsmath}
+\usepackage{setspace}
+\usepackage{mathrsfs}
+
+\makeatletter
+\newif\if@restonecol
+\makeatother
+\let\algorithm\relax
+
+\newcommand{\lsp}[1]{\large\renewcommand{\baselinestretch}{#1}\normalsize}
+\lsp{1.5}
+
+\def\theend{\hspace*{\fill}\rule{0.8ex}{0.8ex}\vspace*{0.8ex}}
+\def\theupend{\vspace*{-0.6cm}\hspace*{\fill}\rule{0.8ex}{0.8ex}\vspace*{0.8ex}}
+\def\mund#1{{\smallskip\noindent{\bf #1}}}
+\def\proof{}
+
+%\newcommand{\eat}[1]{}
+%\let\endalgorithm\relax
+\usepackage[lined,boxed,vlined,ruled]{algorithm2e}
+
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{subfigure}
+\usepackage{vmargin}
+\usepackage{amsfonts}
+\usepackage{fancyhdr}
+\usepackage{epstopdf}
+
+\newcommand{\reminder}[1]{ {\mbox{$<==$}} [[[ { \bf #1 } ]]] {\mbox{$==>$}}}
+\newcommand{\pbtree}{\textsf{PB-tree}\xspace}
+\newcommand{\btree}{\textsf{B-tree}\xspace}
+\newcommand{\bplustree}{\textsf{B$^+$-tree}\xspace}
+\newcommand{\bptree}{\textsf{B$^p$-tree}\xspace}
+\newcommand{\key}[1]{\ensuremath{\textsf{key}_{#1}}\xspace}
+
+\newcommand{\warmup}{\textsf{Warm-up}\xspace}
+\newcommand{\postorder}{\textsf{PostOrder}\xspace}
+\newcommand{\splitfunc}{\textsf{Split}\xspace}
+\newcommand{\predictkeys}{\textsf{PredictTwoKeys}\xspace}
+\newcommand{\upgrade}{\textsf{Upgrade}\xspace}
+
+\newcommand{\predict}{predictive\xspace}
+
+\newcommand{\pbt}{\textsf{B$^p$-tree}\xspace}
+\newcommand{\bt}{\textsf{B$^+$-tree}\xspace}
+
+
+\newcommand{\el}{\ensuremath{\textsf{key}_{min}}\xspace}
+\newcommand{\eu}{\ensuremath{\textsf{key}_{max}}\xspace}
+\newcommand{\elu}{\ensuremath{[\textsf{key}_{min},\textsf{key}_{max}]}\xspace}
+
+%\newtheorem{example}{Example}
+%\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}[chapter]
+%\newtheorem{theorem}{Theorem}
+
+\newcommand{\pcm}{PCM\xspace}
+\newcommand{\nvm}{NVM\xspace}
+\newcommand{\emptyrst}{\textsf{null}\xspace}
+
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{proposition}{Propositon}[chapter]
+\newtheorem{theorem}{Theorem}[chapter]
+\newcommand{\xml}{{\sc xml}\xspace}
+\newcommand{\from}[2]{{\bf [{\sc from #1:} #2]}}
+\newcommand{\eat}[1]{}
+
+\newcommand{\eop}{\hspace*{\fill}\mbox{$\Box$}}
+\newcounter{example}[chapter]
+\renewcommand{\theexample}{\nthesection.\arabic{example}}
+\newenvironment{example}{
+     \refstepcounter{example}
+     {\vspace{1ex} \noindent\bf  Example  \theexample:}}{
+     \eop\vspace{1ex}} %\hspace*{\fill}\vspace*{1ex}}
+ \newcommand{\nthesection}{\arabic{chapter}}
+
+
+\setpapersize{A4} \setmargrb{3.7cm}{2.5cm}{2.5cm}{3.5cm}
+
+%\pagestyle{myheadings} \markright{} \pagenumbering{roman}
+%\pagestyle{fancy}
+
+\begin{document}
+\bibliographystyle{plain}
+
+%%\input{cover}
+\newpage
+\input{title}
+\newpage
+
+\begin{doublespacing}
+\input{ack}
+
+\tableofcontents
+\input{summary}
+
+\listoftables
+\listoffigures \graphicspath{{figs/}}
+
+\input{chp1}
+\input{chp2}
+\input{chp3}
+\input{chp4}
+\input{chp5}
+\input{chp6}
+\input{chp7}
+
+\bibliography{thesis}
+\newpage
+
+\end{doublespacing}
+\end{document}

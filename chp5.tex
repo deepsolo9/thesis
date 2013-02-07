@@ -1,0 +1,463 @@
+\chapter{Predictive Model}
+\label{sec:model}
+
+In this chapter, we are going to present the predictive model which is a key part of our design. 
+In the previous chapter, we have known that there are two major phases in our \bptree, both of
+which will be based on this predictive model. Thus in this chapter, we will talk about how we 
+construct the predictive model and use it in these two phases. We also know that the accuracy of 
+the model is critical to the performance of the whole indexing and thus we will present our strategy 
+to evaluate the realtime status of the predictive model and make adjustment to make it work properly. 
+There will be three major parts of this chapter including the predictive model for warm-up phase, 
+predictive model for update phase and evaluating \bptree. 
+
+\section{Predictive Model for Warm-up} \label{sec:model:warm}
+
+
+In this section, we introduce a \predict model to construct a \bptree structure in the warm-up phase. We will present running examples to show what the predictive model is and how it is integrated into our \bptree. We first discuss how to predict a \bptree skeleton (Section~\ref{subsec:model:warm:skeleton}), and then propose to construct a \bptree (Section~\ref{subsec:model:warm:insertion}).
+
+\subsection{Predicting the {\large \bptree} Skeleton} \label{subsec:model:warm:skeleton}
+
+
+
+Suppose there are $N$ keys in the DRAM \bplustree, the height of the \bplustree is $h$, and the branching factor is $2m$. The \bptree has the same height as the \bplustree, but with a larger branching order $2M=K*2m$, where $K$ is an integer and $K \ge 1$. $K$ can be set by the administrator. We can also predict $K$ as follows.
+
+Let $T$ denote the total number of possible keys in the whole dataset. We  estimate $T$ using the numbers of keys in the histogram. Suppose the maximal number of keys in a bucket is $A$ and the bucket width is $W=\frac{U-L}{|B|}$, thus there are at most $W$ keys in a bucket. We use $N\times \frac{W}{A}$ to predict the possible key number $T$. As there are $T$ keys in \bptree and $N$ keys in \bplustree, we set $K=\log_h \frac{T}{N}$.
+
+Obviously, if we overestimate $K$, the \bptree will turn out
+to be sparse; on the contrary, if we underestimate the number,
+we may need to do more splits.  We assume that each tree node
+in the final \bptree is expected to be $\mu$\% full, i.e.,
+each leaf node has $E=\mu\% \times 2M$ keys.
+Thus the $i$-th level is expected to have $E^i$ nodes (the root is the first level, which has only one node).
+
+After we got the number $K$, we can build the skeleton of the \bptree, in other words, we are going to enlarge the size of each node in the tree by $K$, 
+in which case, there may be many ``underflow'' nodes. But we will not worry about this and we will gradually insert keys into these nodes and raise the average
+node utilization. 
+
+%the branching factor of the \bptree is set to $M=K*m$, where
+%have three possible ways to get the number $T$. First, the number can be set by an administrator. Second, we suppose that all the numbers in the range $[L,U]$ will be inserted and thus $T=U-L$. Third, we
+
+\subsection{{\large \bptree} Construction} \label{subsec:model:warm:insertion}
+
+
+
+
+In this section, we discuss how to construct the \bptree based on the current \bplustree structure. We traverse the \bplustree in post-order. For each node, we predict whether we need to split it based on our \predict model (which will be introduced later). If we need to split it, we split it
+into two (or more) nodes, and insert separators (or keys)
+into its parent node, which may in turn cause the parent node to be split.
+Following this approach, the process will continue to spread to the whole tree. 
+As we employ a post-order traversal, we can guarantee
+that the child splits are before the parent split,
+and our method can keep a balanced tree structure.
+
+Next we discuss how to split a \bplustree node. For ease of presentation, we first introduce a concept.
+
+\begin{definition}[Node Extent] \label{def:extent}
+Each node $n$ in the index tree is associated with a key range $[n_l, n_u]$, where $n_l$ and $n_u$ are respectively the minimum key and the maximum key that could fall in this node. We call this range the \textit{extent} of the node.
+\end{definition}
+
+The extent of node \emph{A} and \emph{B} of the \bplustree in Figure \ref{fig:ex:warmup}, for example, are $[0,19)$ and $[19,32)$ respectively. If a node is not the leftmost or the rightmost child of its parent, we can get its extent from its parent (except for the root node); otherwise we need to determine it from its ancestors. In practice, we need to update this information each time we split or merge nodes and we also need to consider this overhead in the evaluation. 
+
+
+Consider a \bplustree node $n$ on the $i$-th level. Suppose its extent is $\elu$ and currently it has $|n|$ keys, \key{1}, \key{2}, $\cdots$, \key{|n|}. We access the keys in order. Suppose the current key is \key{j}. We next discuss whether to split the node according to \key{j} as follows. As $\el$ is the possible minimum key in the node, we first estimate the number of possible keys between $\el$ and \key{j}, denoted by $P(\el, \key{j})$. Then we estimate the number of keys that can be accommodated between \el and \key{j} on the \bptree, denoted by $A(\el, \key{j})$.
+
+
+Obviously if $P(\el, \key{j})<A(\el, \key{j})$, we do not need to split the node according to \key{j}; otherwise we need to split the node. We generate a \bptree node with keys \el, $\cdots$, $\key{j-1}$, remove the keys \el, $\cdots$, $\key{j-1}$ from the DRAM \bplustree node, insert the key $\key{j}$ to its parent on DRAM \bplustree, and update the pointers of the \bplustree node: the left pointer of this key points to the \bptree node, and the right pointers of this key points to the \bplustree node. Next we repeatedly split the node with keys $\key{j}, \cdots, \key{|n|}$ (Note that \key{j} turns to the first key in the new node). If we cannot split the node for the last key, we will create a \bptree node with the same keys in the \bplustree node, and update the pointer of its parent to the \bptree node. Next we discuss how to predict $A(\el, \key{j})$ and $P(\el, \key{j})$.
+
+\mbox{}
+
+\subsubsection{Predicting the number of possible keys between \el and \key{j}:} 
+If \el and \key{j} are in the same bucket $B_s$, we can estimate $P(\el, \key{j})$ as follows. Based on the histogram, there are $n_s$ keys in the bucket. Then the number of keys between \el and \key{j} can be estimated by (\key{j} - \el) $\times \frac{n_s}{W}$, where $W$ is the bucket width. Thus the number of possible keys in the range is
+
+\begin{equation}
+P(\el, \key{j}) = K \times  (\key{j} - \el) \times \frac{n_s}{W},
+\end{equation}
+
+\noindent if \el and \key{j} are in the same bucket $B_s$.
+
+On the contrary, if \el and \key{j} are in different buckets, we estimate the number as follows. Without loss of generality, suppose \el is in bucket $B_s$ and \key{j} is in bucket $B_e$. Let $B_s^u$ denote the upper bound of keys in bucket $B_s$ and $B_e^l$ denote the lower bound of keys in bucket $B_e$. Thus the number of keys between \el and \key{j} in bucket $B_s$ is ($B_s^u$-\el) $\times \frac{n_s}{W}$. The number of keys between \el and \key{j} in bucket $B_e$ is (\key{j} - $B_e^l$) $\times \frac{n_b}{W}$. Thus the total number of keys between \el and \key{j} is ($B_s^u$-\el) $\times \frac{n_s}{W}$ + $\sum_{t=s+1}^{e-1} n_t$ + (\key{j} - $B_e^l$) $\times \frac{n_b}{W}$. Thus the number of possible keys between \el and \key{j} is
+\begin{equation}\hspace*{-2em}P(\el, \key{j}) = K \times \bigl( (B_s^u-\el) \times \frac{n_s}{W} + \sum_{t=s+1}^{e-1} n_t + (\key{j} - B_e^l) \times \frac{n_b}{W} \bigr),
+\end{equation}
+\noindent if \el and \key{j} are in different buckets.
+
+
+\mbox{}
+
+\subsubsection{Predicting the number of keys that can be accommodated between \el and \key{j}:} 
+
+Note that node $n$ has $|n|$ keys and it is expected to have $E$ keys, thus the number of accommodated keys in this node is $E-|n|$. Thus $$A(\el, \key{j}) = \min(\key{j}-\el, E-|n|),$$ if $n$ is a leaf node.
+
+If node $n$ is a non-leaf node, we can directly add $j$ children between the two keys. In addition, we can also add some keys between \el and \key{j} as there are $E-|n|$ positions which are not used in the node. Obviously, we insert
+at most $\min(\key{j}-\el, E-|n|)$ keys in the node. Thus we can add at most
+$c=j+\min(\key{j}-\el, E-|n|)$ children under the node between \el and \key{j}. As node $n$ is in the $i$-level, the children are on $i+1$-level. As each child can have $E$ keys and $E+1$ children, each node can have $(E+1)^{h-i-1}$ descendants. Thus there are $c\times \sum_{t=0}^{h-i-1}(E+1)^t$ nodes between the two keys. As each node can accommodate $E$ keys, the total number of accommodated keys is
+\begin{equation}
+A(\el, \key{j})=E\times c\times \sum_{t=0}^{h-i-1}(E+1)^t,
+\end{equation}
+\noindent if node $n$ is a non-leaf node.
+
+
+\begin{figure}
+\linesnumbered \SetVline \setcounter{algocf}{0}
+\begin{algorithm} [H]
+\KwIn{\bplustree and Histogram in DRAM Buffer}
+\KwOut{\bptree on PCM}
+%\label{alg:warmup}
+\Begin{
+    Let $r$ denote the root of the \bplustree, Level $i=0$ \;
+    \postorder($r$, $i$, Histogram) \; \nllabel{alg:warmup:postorder}
+}
+\caption{Warm-up(\bplustree, Histogram)}
+\end{algorithm}
+
+\begin{function}[H]
+\KwIn{$n$: \bplustree node; $i$: Level of $n$; Histogram}
+ \KwOut{\bptree nodes}
+  \Begin{
+        \For{each child $c$ of $n$}
+        {
+            \postorder($c$, $i+1$, Histogram)\;
+        }
+        \key{j} = \splitfunc($n$, $i$, Histogram)\; \nllabel{func:postorder:split}
+        \While{$\key{j}~!=~\phi$}
+        {
+            Generate a \bptree node with \el,$\cdots$,\key{j-1}\; \nllabel{func:posorder:generatesplit}%branching order $M$ and
+            Remove keys after $\key{j}$ from \bplustree node $n$\; \nllabel{func:posorder:remove}
+            Insert \key{j} to the parent of $n$ on \bplustree and update the pointers \; \nllabel{func:posorder:insert}
+            %: the left pointer of this key to the \bptree node, and the right pointers of this node to the \bptree node\;
+            Split($n$, $i$, Histogram)\; \nllabel{func:posorder:split2}
+        }
+        Create a node with \el,$\cdots$,\key{j-1}, remove $n$, update $n$'s parent\;
+        \nllabel{func:posorder:generatesnonplit}
+        % of node $n$ to this \bptree node \; %branching order $M$ and keys
+ }
+        \caption{\postorder($n$, $i$, Histogram)}
+\end{function}
+\begin{function}[H]
+\KwIn{$n$: \bplustree node; $i$: Level of $n$; Histogram}
+ \KwOut{Key: Split Key}
+  \Begin{
+        Let \el denote the first key in node $n$ \;
+        \For{$j=2, 3, \cdots |n|$}
+        {
+            \If{\predictkeys(\el, \key{j}, $i$)}
+            {
+               return \key{j} ;
+            }
+        }
+        return $\phi$ \;
+        \caption{\splitfunc($n$, $i$, Histogram)}
+ }
+\end{function}
+\begin{function} [H]
+\KwIn{\el; \key{j}; Histogram}
+ \KwOut{True or false}
+  \Begin{
+        Compute A(\el, \key{j}); %the number of keys between \el and \key{j} that can be accommodated in \bptree\;
+        Compute P(\el, \key{j}) \; %the estimated number of keys between \el and \key{j} \;
+        \lIf{$A(\el, \key{j})<P(\el, \key{j})$}
+        {
+            return true;
+        }
+
+        \lElse
+        {
+            return false;
+        }
+        \caption{\predictkeys(\el, \key{j}, Histogram)}
+ }
+\end{function}
+        \caption{Warmup Algorithm} \label{alg:warmup}
+         \setcounter{algocf}{1}
+\end{figure}
+
+
+To summarize, we can use the predicted numbers to split the nodes. Iteratively, we can split all the nodes and insert the new nodes into PCM. Figure~\ref{alg:warmup} illustrates the algorithm. The \warmup algorithm first traverses
+the \bplustree in post-order by calling its function \postorder (line~\ref{alg:warmup:postorder}). Function \postorder splits the nodes iteratively. Given a node $n$ on level $i$, it checks
+whether the node should be split by calling function \splitfunc (line~\ref{func:postorder:split}), which is used to split a node based on our \predict model. If our model decides to split node $n$, we generate a \bptree node with keys, \el, $\cdots$, $\key{j-1}$ (line~\ref{func:posorder:generatesplit}), remove the keys, \el, $\cdots$, $\key{j-1}$, from the DRAM \bplustree node (line~\ref{func:posorder:remove}), insert the key $\key{j}$ to its parent on DRAM \bplustree (line~\ref{func:posorder:insert}), and update the pointers of the \bplustree node: the left pointer of this key to the \bptree node, and the right pointers of this key to the \bplustree node. Next we repeatedly split the node with keys, $\key{j}, \cdots, \key{|n|}$ (line~\ref{func:posorder:split2}). If we cannot split the node for the last key, we will create a \bptree node with the keys, and update the pointer of its parent to the \bptree node (line~\ref{func:posorder:generatesnonplit}). Iteratively, we can construct the \bptree structure.
+
+We show an example of the split algorithms in Figure~\ref{fig:ex:warmup}. Here we take the leaf node for an example instead of the whole split algorithm. As can be seen from the Figure~\ref{fig:ex:warmup}, the previous node $C$ is split into two nodes $C$ and $C'$, though it is not full. Since there are only two keys in previous node $C$, we shall calculate A(\el, \key{2}) and P(\el, \key{2}) as follows. A(\el, \key{2}) $= \min(39 - 32, 4 - 2) = 2$, P(\el, \key{2}) $= (39 - 32) * \frac{8}{20} = 2.8$. As A(\el, \key{2}) $<$ P(\el, \key{2}), according to the algorithms in Figure \ref{alg:warmup}, node $C$ needs to be split and a new node $C'$ is created and then we update the pointers.
+
+\section{Predictive Model for Updates}  \label{sec:model:update}
+
+
+In this section we propose a \predict model for the update phase. We will describe the basic operations on a \bptree, including search (Section~\ref{sec:model:update:search}), deletion (Section~\ref{sec:model:update:deletion}), and insertion (Section~\ref{sec:model:update:insertion}). Actually the search and deletion processes are similar to that of the standard \bplustree (except the need
+to deal with unordered leaf entries). Thus
+our main focus will be on the insertion.
+
+\subsection{Search}\label{sec:model:update:search}
+
+Since we use a small DRAM as a buffer, some
+newly inserted keys will still be in the main memory \bplustree and
+have not been merged into the main \bptree on PCM.
+%Thus, both the \bplustree and \bptree need to be searched.
+Thus, besides searching the main \bptree in the manner similar to that of the \bplustree, for our \bptree, a search operation still needs to search the small \bplustree first. Then there will be two steps in the search process.
+We first lookup the small \bplustree in the buffer, and then search the main \bptree. As noted, since the entries within a leaf node of the \bptree may not
+be sorted, the search will examine every key entry.
+If neither of the two steps return any results, \textsf{null} will be returned. The above steps are summarized in Figure~\ref{alg:search}.
+Obviously the time complexity of the search operation is $\mathcal{O}(h)$, where $h$ is the height of the \bptree and it is similar to the traditional \bplustree.
+
+
+\begin{figure}[!t]
+\linesnumbered \SetVline \setcounter{algocf}{1}
+\begin{algorithm}[H]
+\caption{Search(\bplustree, \bptree, \key{})}
+\KwIn{\bplustree; \bptree; A search \key{}}
+\KwOut{Search result}
+\label{alg:alg3}
+\Begin{
+    Search both the \bplustree and \bptree using \key{} \;
+    \If{Find \key{} in \bplustree or find \key{} in \bptree}{
+        return the entry or entries;
+    }
+    \Else {
+        return \textsf{null}\;
+    }
+}
+\end{algorithm}
+\caption{\bptree: Search Operation}\label{alg:search}
+\end{figure}
+
+\subsection{Deletion}\label{sec:model:update:deletion}
+
+Like search, deletion also requires searching both \bptree and \bplustree.
+A deletion on the \bptree is handled in a similar way as that for
+standard \bplustree, but with some differences.
+%The first difference is that we only remove the key in the leaf nodes and do not remove it from internal nodes. The second one is that
+First, the deleted entry can be replaced by the last key entry in the
+node. This is to pack the entries within the leaf node.
+Second,
+if the corresponding leaf node has fewer than $M$ keys, we will not borrow keys from its siblings. This can avoid the merge operations. The reason is that since the read latency of PCM is much shorter than the
+write latency, the overhead caused by the empty node in the query processing stage is negligible. Furthermore, the space could be reserved for the future keys to reduce subsequent writes.
+
+
+
+Given a key to delete, we first search it from the \bplustree. If we find the entry, we directly remove it from \bplustree. If not, we then search it in the \bptree. If we find the leaf node in the \bptree, we remove the key from the node. Note that we will not do merge operations even if the node has less than half (M) keys. We do not propagate the deletion operation to its ancestors. The above steps are summarized in Figure~\ref{alg:deletion}. Obviously the time complexity of the deletion operation is $\mathcal{O}(h)$.
+
+
+
+\begin{figure}[htup]
+\linesnumbered
+\begin{algorithm}[H]
+\caption{Delete(\bplustree, \bptree, \key{})}
+\KwIn{\bplustree, \bptree, \key{}}
+\KwOut{Delete status}
+\label{alg:alg2}
+\Begin{
+    result $\leftarrow$ false \;
+    Search the \bplustree using \key{} \;
+    \If{Find \key{} in \bplustree}{
+        delete the entry in a \bplustree operation manner\;
+        result $\leftarrow$ true \;
+    }
+    Search the \bptree using \key{} \;
+    \If{Find \key{} in \bptree}{
+        remove the entry from the leaf node\;
+        result $\leftarrow$ true \;
+    }
+    return result \;
+}
+\end{algorithm}
+
+
+\caption{\bptree: Deletion Operation}\label{alg:deletion}
+\end{figure}
+
+
+\subsection{Insertion}\label{sec:model:update:insertion}
+
+Since \bptree is maintained with the aid of a DRAM buffer and a \predict model, both the \bplustree in the buffer and the histogram of the \predict model need to be updated in each insertion. When the buffer is full, the \bplustree will be merged into the main \bptree on PCM.
+
+
+All the keys in the \bplustree will be inserted into the main tree one by one. Once a key is to be inserted, we first look up the leaf node \emph{L} that the new key belongs to as the standard \bplustree. Then we predict whether it should be directly inserted into the node or the node should be split. We first compute the number of keys that can be accommodated in this node $L$, denoted by $ANO_L$. We then predict the number of keys that could fall in this node, denoted by $PNO_L$. If $PNO_L\geq ANO_L$, we need to split the node; otherwise, we will not. If we need to split the node, a new leaf node will be created and a ``middle'' key will be chosen based on the \predict model and pushed upward to the parent node. Existing keys in the node \emph{L} needs to be adjusted according to the ``middle'' key.
+
+
+Note that the middle key is not the key in the median position as the standard \bplustree. Instead, we need to select a median key based on the data distribution (which will be discussed later). As we insert a middle key into its
+parent, it may cause its parent to split. The above steps are summarized in Figure~\ref{alg:insertion}.  Next, we discuss how to compute $PNO_n$ and $ANO_n$ for node $n$.
+
+\mbox{}
+
+\subsubsection{Computing the accommodated key number of node $n$, $ANO_n$:} 
+
+Suppose node $n$ is in the $i$-th level. Each node has at most $2M$ keys and 2M+1 pointers, thus node $n$ has $\sum_{t=1}^{h-i} (2M+1)^{t}$ descendants. Thus the accommodated key number of node $n$ is
+\begin{equation}ANO_n=2M*\sum_{t=0}^{h-i}(2M+1)^t.\end{equation}
+
+
+%its parent based on the pointer and finds the lower bound of keys in this node \el and the lower bound of keys in this node \eu.
+
+\mbox{}
+
+\subsubsection{Predicting the possible key number occupancy in node $n$, $PNO_n$:} 
+
+Next we predict the total number of keys that could potentially belong to this node. We first find the extent of this node, denoted by $\elu$, where $\el$ and $\eu$ are respectively the minimum key and the maximum key in this node. Based on the two bounds, we can compute the number of possible keys fell into this node as discussed in Section~\ref{subsec:model:warm:insertion}.
+
+That is if \eu and \el are in the same bucket $B_s$,
+
+\begin{equation}PNO_n = K \times  (\eu - \el) \times \frac{n_s}{W};\end{equation}
+
+
+\noindent otherwise if \el and \eu are respectively in two different buckets $B_s$ and $B_e$.
+
+\begin{equation}PNO_n = K \times \bigl( (B_s^u-\el) \times \frac{n_s}{W} + \sum_{t=s+1}^{e-1} n_t + (\eu - B_e^l) \times \frac{n_b}{W} \bigr).\end{equation}
+
+
+Based on $ANO_n$ and $PNO_n$, we can decide whether to split a node $n$. Next we discuss how to select a middle key if we need to split a node.
+
+
+\mbox{}
+
+\subsubsection{Computing the middle key in node $n$, $midKey$:}
+Consider the keys in $n$ are \key{1}, \key{2}, $\cdots$, \key{|n|}. Without loss of generality, suppose \key{1} $\leq$ \key{2} $\leq$  $\cdots$ $\leq$ \key{|n|}. Based on extent of a node, we define the middle key formally.
+
+
+
+\begin{definition}[Middle Key]
+A key $\key{i}$ in node $n$ is called a middle key if $$P(\el, \key{i})\leq \frac{P(\el, \eu)}{2},$$ $$P(\el, \key{i+1})>\frac{P(\el, \eu)}{2},$$ where $P(\key{i}, \key{j})$ denote the number of predicted keys between \key{i} and \key{j}.
+\end{definition}
+
+A straightforward method to find the middle key from a node is to compute $P(\el, \key{i})$ for each $i$ from $1$ to $|n|$ until we find the middle key. The complexity is $\mathcal{O}(M)$. If the keys are sorted, e.g., the keys in an internode, we can use an alternative method. We have an observation that if the keys are sorted, $P(\el, \key{i})\leq P(\el, \key{j})$ for $i<j$ as formalized in Lemma~\ref{lemma:seq}. Thus we can employ a binary search method to find the middle key and reduce the time complexity to $\mathcal{O}(\log M)$. If the keys are unsorted, the complexity is $\mathcal{O}(M)$.
+
+
+\begin{lemma} \label{lemma:seq}
+Given a node $n$ with keys ordered as
+\key{1}, \key{2}, $\cdots$, $\key{|n|}$, and two keys $\el\leq \key{1}$ and $\eu\geq \key{|n|}$, we have $$P(\el, \key{i})\leq P(\el, \key{j})$$ for $i<j$.
+\end{lemma}
+
+
+Thus the worst-case time complexity of an insertion operation is $\mathcal{O}(M+h \times \log M)$, where $M$ is the branching factor and $h$ is the height.
+
+
+
+
+\begin{figure}[!t]
+\linesnumbered
+\begin{algorithm}[H]
+\caption{Insert(\bplustree, \bptree, \key{})}
+\KwIn{\bplustree, \bptree, \key{}}
+\KwOut{Updated \bptree}
+\label{alg:alg1}
+\Begin{
+    Search the leaf node for \key{}, $L$ \;
+
+    \upgrade(L, Histogram)\;
+}
+
+\end{algorithm}
+
+
+\begin{function} [H]
+\KwIn{$n$: A \bptree node, Histogram}
+  \Begin{
+       $PNO_n \leftarrow $ GetPredictedNumber($n$)\;
+        $ANO_n \leftarrow $ GetAccomodatedNumber($n$)\;
+        \If{$PNO_n < ANO_n$}{
+            insert \key{} into $n$\;
+            return\;
+        }
+        \Else{
+            $midKey \leftarrow GetMiddleKey(n)$\;
+            $midKey$ is pushed upward to the parent $p$ \;
+            A new leaf node $n'$ is created and new pointer from the parent node to $n'$ \;
+            Remove keys larger than $midKey$ from $n$ to $n'$ \;
+            \upgrade($p$, Histogram) \;
+        }
+        \caption{\upgrade(n, Histogram)}
+ }
+\end{function}
+
+\caption{\bptree: Insertion Operation}\label{alg:insertion}
+\end{figure}
+
+\section{Evaluating {\large \bptree}}
+\label{sec:cost}
+
+In this section, we introduce several metrics to evaluate
+the status of \bptree and use them to guide the future prediction which is necessary to keep the tree balanced.
+
+The first metric is insertion overflow.
+When inserting a new entry into the \bptree, we employ a leaf-to-root way, that is we always insert a key into leaf node first. If the node overflows, it needs to be split and some of the keys need to be moved to other nodes.
+%% TANKL: our bptree adopts "unsorted leaf" strategy now. so the following
+%%        paragraph is no longer valid
+%When we insert a key into the leaf node, we need to insert it into a specific position to guarantee the order of keys. In this case, we need to move the keys larger than the inserted key. Moreover if the parent needs to split, we need to repeat the operations. Although we can make the keys unordered~\cite{chen2011rethinking}, it may decrease the performance, especially for internal nodes.
+Obviously, the larger the number of keys in a node is, the higher is the
+probability for it to split and the overhead incurred
+to move keys. Thus we can use the number of keys in a node to
+evaluate the degree of insertion overflow.
+Given a node $n$ with $n_{keys}$ keys.
+A larger $n_{keys}$ implies there is a higher probability for $n$
+to split, resulting in a larger number of possible writes.
+
+%Let $n_{w}$ denote the number of writes and $n_{in}$ denote the number of insertions. If $n_{w}>\delta n_{in}$, for example $\delta=\frac{h}{3}$, we need to lots of writes, and we need to rebuild the \bptree.
+
+
+The second metric is unqualified-node ratio. A node is called an \emph{unqualified node} if its key number is smaller than $M$. If there are many unqualified nodes, the constructed \bptree is very sparse. For a node $n$, the
+smaller the value of $n_{keys}$, the sparser the tree will be.
+To evaluate the overall \bptree, we need to consider all tree nodes. Let $n_{un}$ denote the number of unqualified nodes.
+The larger the value of $n_{un}$,
+the sparser the \bptree. We can easily determine $n_{un}$
+as follows. Initially, all nodes are unqualified nodes and $n_{un}$ is the total number of nodes. When inserting a key, if an unqualified node turns to be a qualified node (with key number no smaller than $M$), we decrease the number $n_{un}$ by 1.
+
+Next we combine the above two factors to evaluate a \bptree. As the expected utilization is $\mu\%$ and then the average key number of a node is $\mu\% \times 2M$, we can use the following equation to evaluate the \bptree,
+
+\begin{equation}Q=\sum_n \delta \times (n_{keys}- \mu\% \times 2M),\end{equation}
+
+\noindent where
+
+\begin{equation}
+  \delta = \left\{
+   \begin{array}{ll}
+   \frac{n_{keys}}{\eu-\el}  & n_{keys}\geq \mu\% \times 2M \\
+   \\
+   \frac{\eu-\el}{n_{keys}} &  n_{keys}< \mu\% \times 2M \\
+   \end{array}
+  \right.
+\end{equation}
+\noindent and $\elu$ is the extent of node $n$, in \cite{DBLP:journals/csur/Comer79} $\mu$ is 69 for the standard \bplustree .
+
+\mbox{}
+
+If $Q$ is larger than 0, then it means that the
+\bptree is very dense. The larger the value of $Q$, the denser the \bptree
+will be. However it may involve many more numbers of writes when the
+tree needs to be reorganized (by splits and merges).
+If $Q$ is larger than an upper bound $\tau_u$, we need to tune our model
+to do more (planned) splits (when merging \bplustree with \bptree).
+
+On the contrary, if $Q$ is smaller than 0, \bptree is very sparse.
+The smaller the value of $Q$, the sparser the \bptree. If $Q$ is smaller
+than a lower bound $\tau_l$, we need to tune our method to reduce
+the number of (planned) splits.
+
+
+%Thus we can tune the tree structure based on this metric.
+%If $n_{un}$ is in $[M, 2M]$, the \bptree is very robust. If $n_{un}<\tau$, for example $\tau=M/2$, we need to rebuild the \bptree.
+%The number of writes of inserting a node to the leaf is $(M+2)\times n_{io}$.
+%If we the corresponding leaf node is not overflow, we directly insert to the leaf node; otherwise we insert the median of the node into its parent, allocate a new leaf node, and move the half the node's elements into the new node. We need to copy $M$ data into the new node and insert the median to the parent and add the two children links to the two nodes\reminder{add the number of writes inserting a data into the leaf and intermedin nodes}. The number of writes is $(M+2)$. Let $n_{io}$ denote the number of asbestoses of the node that needs to be split. The number of writes of inserting a node to the leaf is $(M+2)\times n_{io}$.
+
+
+
+
+\iffalse
+$PNO_L \leftarrow $ GetPredictedNumber($L$)\;
+    $ANO_L \leftarrow $ GetAccomodatedNumber($L$)\;
+    \If{$PNO_L \leq ANO_L$}{
+        insert \key{} into $L$\;
+        return\;
+    }
+    \Else{
+        $midKey \leftarrow GetMiddleKey(L)$\;
+        $midKey$ is pushed upward to the parent $p$ \;
+        A new leaf node $L'$ is created and new pointer from the parent node to $L'$ \;
+        Remove keys larger than $midKey$ from $L$ to $L'$ \;
+        \upgrade($p$, Histogram) \;
+    }
+\fi
+%Note that we can keep the value $n_{io}$ for each node
+
+\section{Summary}
+In this chapter, we introduced the predictive model we use to construct the \bptree. There are two phases when constructing the tree including 
+the warm-up phase and the update phase. The warm-up phase means the time before the first time that the DRAM buffer is full and after that we 
+start the update phase. In both phases, the predictive model is very important and it will influence whether we will split a node in advance or not. 
+Then we talked about the normal operations of our \bptree and we gave the detailed algorithms. After that we proposed a evaluating model to evaluate the 
+realtime status of our predictive model and some metrics are adopted to make it work properly and further ensure a good status of the whole indexing tree. 
+
+\newpage

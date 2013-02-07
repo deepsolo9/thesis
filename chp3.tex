@@ -1,0 +1,227 @@
+\chapter{Literature Review}
+\label{sec:rw}
+
+Database research community has contributed a lot to the algorithms design of the traditional database systems in the last several decades. Database system is also very complex and there are many components inside each of which can be worthy of lots of effort to work on. In this work, we mainly focus on the indexing technique and query processing algorithms. In this thesis, we have proposed a new design of \bplustree technique and we will leave the query processing to the future work.
+
+In this chapter, we did the literature review, including the write-optimized indexing algorithms, traditional query processing algorithms and some recent PCM-based main memory system proposals. Since our indexing design has a prediction model, we also reviewed some works on histograms and how to use histograms to construct the prediction model.
+
+\section{Write-optimized Indexing Algorithms}
+In previous chapters we know that our main design goal is to reduce the number of writes, thus we first did a brief survey of the write-optimized indexing techniques. We want to find out whether these existing techniques can be used to our new PCM-based systems or not and if they can not be used directly, whether we can borrow some ideas from them.
+Actually write-optimized \bplustree index has been an intensive research topic for
+more than a decade. In this section, we will review the write-optimized indexing algorithms for HDD, SSD technologies and their design consideration is similar to ours, but there are also some differences. For HDD-based indexing, the proposed solutions are mainly focusing on
+using some DRAM buffer to convert small random writes into sequential writes. For SSD-based indexing, some of the proposed solutions change the
+major structure of $B^+$-tree and some solutions add an inner layer using SSD between DRAM and HDD, but their major design consideration is very similar and they expect to avoid the erase-before-writes as much as possible and they also expect to convert the small random writes into sequential writes in some sense.
+
+\subsection{HDD-based Indexing}
+For the \bplustree index on hard disks,
+there are many proposals to optimize the efficiency
+of write operations and logarithmic
+structures have been widely used.
+In \cite{o1996log}, O'Neil et al. proposed the LSM-tree to
+maintain a real-time low cost index for the database systems.
+LSM-tree (Log-Structured Merge-tree) is a disk-based data structure and it was designed to support high update rate over an extended period efficiently. The basic idea of LSM-tree is to use an algorithm to defer and batch the random index changes to reduce the disk arm movements. Some smaller components of LSM-tree will be entirely memory resident and the larger and major components will be disk-based. The smaller components resident in memory will be used as a buffer to keep the frequently referenced page nodes in the larger components. The insertion to the memory resident component has no I/O cost and the larger component on disk is optimized for sequential disk access with nodes 100\% full. This optimization is similar to that used in the SB-tree \cite{o1992thesb}. Both of them support multi-page reads or writes during a sequential access to any node level below the root, which can offer high-performance sequential disk access for long range retrievals. Each time when the smaller component reaches a threshold size near the maximum allotted, it will be merged into the large components on the disk. A search on the LSM-tree will search both the smaller components in the memory and the larger components on the disk. Then LSM-tree is most useful in applications where index insertion are more than searches, which is just the case for history tables and log files etc.
+
+In \cite{arge1995buffer}, Lars Arge proposed the buffer tree for the optimal I/O efficiency. The structure of the buffer tree is very similar to that of the traditional \bplustree. The major difference is that in buffer tree, there is a buffer in the main memory for each node on the hard disk. When we want to update the tree, the buffer tree will construct an entry with the inserted key, a time stamp and an indication of whether the key is to be inserted or deleted and put the entry into the buffer of the root. When the main memory buffer of the root is full, it will insert the elements in the buffer downwards to its children and this buffer-emptying process will be done recursively on internal nodes. The main contribution of the buffer tree is that it is a simple structure with efficient I/O operations and can be applied to other related algorithms.
+
+
+Graefe proposed a new write optimized \bplustree index in \cite{graefe2004write}
+based on the idea of the log-structured file systems \cite{rosenblum1991design}.
+Their proposals make the page migration more efficient and retain the fine-granularity locking, full concurrency guarantees and fast lookup performance at the same time.
+
+Most of the HDD-based write optimized tree indexing follow the following two idea. First, most of them want to convert the many random writes to batch sequential writes to raise the efficiency; second, a small area of DRAM can be used as the buffer. For our design, we want to support both random and sequential writes efficiently, thus we cannot ``hold'' the random writes to a sequential write. But the idea of using DRAM as buffer can be used as well. In previous chapters, we have found out that a small area of DRAM buffer can make our system much more efficient.
+
+\subsection{SSD-based Indexing}
+\label{sec:ssd-index}
+Recently, there are some proposals
+on the write-optimized
+\bplustree index on SSDs \cite{agrawal2009lazy}\cite{li2010tree}\cite{wu2007efficient}.
+The major bottleneck of the \bplustree
+index for SSDs to overcome is the rather
+slower small random writes because of the erase-before-write requirement.
+
+In \cite{wu2007efficient}, an efficient \btree layer (BFTL) was proposed to handle the fine-grained updates of \btree index efficiently. BFTL is introduced as a layer between file systems and FTL and thus there is no need to modify the existing applications. BFTL is considered as a part of the operating system. BFTL consists of a small reservation buffer and a node translation table. \bplustree index services call from the upper-level applications are handled and translated from the file system of operation system to BFTL and then a block-based calls are sent from BFTL to FTL to do the operation. When a new record is inserted or updated to the \bplustree, it will first be temporarily held by the reservation buffer of BFTL and then flushed in batch operation to reduce the writes latency.
+
+FlashDB was proposed in \cite{nath2007flashdb} and it is a self-tuning database system optimized for sensor networks using flash SSDs. The self-tuning \bplustree index in the FlashDB uses two modes, Log and Disk, to make the small random writes together on consecutive pages. The \bplustree(Disk) assumes that the storage is a disk-like block-device. The disadvantage is that updates are expensive. Even if only a small part of the node needs to be updated, the whole block needs to be written. Thus \bplustree(Disk) is not suitable for write-intensive workload. \bplustree(Log) design is a log-structured-like indexing and it can avoid the high update cost of \bplustree(Disk). The basic idea is to construct the index tree as transaction logs. Updates will be put into buffer first and flushed into SSD when the buffer contains enough data to fill a page.
+
+More recently, Li et al.~\cite{li2010tree} proposed the FD-tree which consists of two main parts, a head \bplustree in the DRAM and several levels of sorted runs in the SSDs. Thus the basic idea is to limit the random writes to the small top \bplustree and then merge into the lower runs after they have been transformed into sequential writes. FD-tree modifies the basic structure of a traditional \bplustree and their major contribution is to limit random writes to a small area and further raise the insertion efficiency.
+
+For the SSD-based indexing, some of them tried to use the same idea of that of the HDD-based indexing. We can adopt the idea of using DRAM as a buffer. FD-tree is also efficient in some sense, but it modified the basic structure of the \bplustree, which is not what we want. We want that our \bplustree can be easily adapted to the existing traditional database systems and thus we do not want to modify the main structure too much.
+
+
+\subsection{WORM-based Indexing}
+There are also some proposals focusing on the Write-Once-Read-Many (WORM) storage \cite{DBLP:conf/vldb/MitraHW06}\cite{DBLP:conf/aina/PeiLY07}. In \cite{DBLP:conf/vldb/MitraHW06}, Mitra, Hsu and Winslett proposed a novel efficient trustworthy inverted index for keyword-based search and a secure jump index structure for multi-keyword searches. In \cite{DBLP:conf/aina/PeiLY07}, Pei et al. proposed the TS-Trees and they also built the tree structure based on a probabilistic method. These WORM indexing proposals mainly focused on designing mechanisms to detect adversarial changes to guarantee trustworthy search.
+Unlike WORM indexing, in PCM-based indexing, we want to reduce
+the number of writes. Moreover, we can update the index and afford
+the small penalty of adjustments due to data movement if the
+prediction is no longer that accurate because of changes in data distributions over time.
+
+\subsection{PCM-based Indexing}
+The recent study \cite{chen2011rethinking}
+has outlined new database algorithm design considerations
+for PCM technology and initiated the
+research on algorithms for PCM-based database systems.
+To our best knowledge, this paper is the most relevant to our work until now.
+In the paper, Chen, Gibbons and Nath
+described the basic characteristics and the potential
+impact of PCM on the database system design.
+They presented analytic metrics for PCM endurance,
+energy and latency, and proposed techniques to
+modify the current \bplustree index and Hash Joins for better efficiency
+on the PCM-based database system. Their idea is to unsort the keys in the node of \bplustree which can reduce large number of writes. In our proposal, we will take a step further in this direction and
+design a PCM-aware \bplustree, called the \bptree and
+and will compare our \bptree with their \bplustree.
+
+\section{Query Processing Algorithms}
+Query processing is an important part of the traditional database systems. The aim of query processing is to transform a query in a high-level declarative language (e.g. SQL) into a correct and efficient execution strategy. Different execution strategies can lead to much difference in execution efficiency. The traditional query processing algorithms include two types, one is heuristic-based query optimization and the other is cost-based query optimization. In heuristic-based query optimization, given a query expression, the algorithm will perform selections and projections as early as possible and it will try to eliminate duplicate computations. In cost-based query optimization, the algorithm will estimate the cost of different equivalent query calculator and choose the execution plan with the lowest cost estimation.
+
+In this section, we will review the existing query processing algorithms. We mainly focus on two parts, the adaptive query processing and the recently proposed query processing for SSD-based database systems. This section of review will give us some inspiration about what to do in the future and we will discuss about it in detail in Chapter~\ref{sec:conclusion}.
+
+
+\subsection{Adaptive Query Processing}
+In traditional query processing, the query optimizer can not have necessary statistics during the compile time, thus it may lead to poor performance, especially in long running query evaluations. Adaptive query processing addresses this problem and the idea is to adapt the query plan to changing the environmental conditions at runtime. In \cite{hellerstein2000adaptive}, adaptive query processing is defined as that if the query processing system receives information from its environment and determines its behavior according to the information in an iterative manner, that means there is a feedback loop between the environment and the behavior of the query processing system. The research on adaptive query processing mainly lies on two main directions. One is to modify the execution plan at runtime according to the changes of the evaluation environment, the other is to develop new operators that has more flexibility to deal with unpredictable conditions. Then we will review some of the classical proposals on adaptive query processing.
+
+\subsubsection{Memory Adaptive Sorting and Hash Join}
+
+Memory shortage is a common design restriction for query processing techniques, especially for sorting and join since they need large amount of excess memory. In \cite{Pang93memory-adaptiveexternal}, Pang et al. introduces new techniques for external sorting to adapt to fluctuations in memory availability. Since memory buffer size can greatly influence the performance of sorting, memory-friendly management strategies need to be taken. \cite{Pang93memory-adaptiveexternal} introduces a dynamic splitting technique, which adjusts the buffer size to reduce the performance penalty due to the memory shortages. The basic idea is to split the merge step of sorting run into some smaller sub-steps in case of memory shortages and when the memory buffer is larger, it will combine some small sub-steps into larger steps. This adjust is adaptive and is balancing well. For hash join, \cite{Pang:1993:PPH:170035.170051} proposes partially preemptible hash joins (PPHJs) which is one kind of memory adaptive hash joins. The idea is similar to that of \cite{Pang93memory-adaptiveexternal}, they split the original relations and if the memory buffer is not enough, it will flush part of the partition to disk. The most efficient case for PPHJs is when the inner relation can be put in memory but the outer relation can only be scanned and partially put into the buffer. It can reduce both I/O and the total response time. \cite{Zhang:1997:DMA:645923.671006} is also a memory-adaptive sorting which is complementary to \cite{Pang93memory-adaptiveexternal}. It allows many sorts to run concurrently to improve the throughput, while \cite{Pang93memory-adaptiveexternal} focuses on improving the query response time.
+
+
+\subsubsection{Operators for Producing Partial Results Quickly}
+
+In most database applications, we focus on the total response time of all the results. But in some applications especially in online aggregation, it is important to get some of the results in a very short time and respond earlier while leaving the remaining process running at the same time. To this end, pipelining algorithms are used for the implementation of join and sort operators. Ripple joins \cite{Haas:1999:RJO:304182.304208} are a new family of physical pipelining join operators. They make use of both block nested loops join and hash joins. They target on online processing of multi-table aggregation queries in traditional DBMS. It is designed to minimize the time until an acceptably precise estimate of the query result is available, as measured by the length of a confidence interval. Ripple join comes from the nested loops join since it has an outer relation and an inner relation, the difference is that it adjusts the retrieve rates of tuples from these two input based on the statistical information during the runtime and reduce the response time of important part of the whole results. Xjoin \cite{urhan2000xjoin} is a variant of Ripple joins. It partitions the input and thus requires less external memory, which makes it more suitable for parallel processing. \cite{Raman:2000:ODR:765233.765239} proposes another pipelining reorder operator for providing user control during long running, data intensive operations to get partial results during the process. The input of this operator is an unordered set of data and it can produce a nearly sorted result according to user preferences which can change during the runtime with an attempt to ensure that interesting items are processed first.
+
+
+\subsubsection{Algorithms that Defer Some Optimization Decisions until Runtime}
+
+Sometimes the statistical information gathered in the beginning of the query processing is not that accurate which can lead to a bad performance. There are some algorithms that defer some optimization decisions until they have collected enough statistics. \cite{Kabra:1998:EMR:276305.276315} proposes an algorithm that detects sub-optimality in query plans at runtime, through on-the-fly collection of query statistics. It can improve the total performance by either reallocating resources (e.g. memory) or by reordering the query plan. It introduces a new operator called statistics collector operator which is used for the re-optimization algorithm. The algorithm is heuristics-based and relies heavily on intermediate data materialization. The new operator is inserted into the query plan, ensuring that it does not slow down the query by more than a specific fraction and also assigns a potential inaccuracy level of low, medium or high to the various estimates, which will be used in the following processing.
+
+
+\subsection{SSD-based Query Processing}
+Recently there are some research work on query processing for SSD-based database systems. In previous Section~\ref{sec:ssd-index}, we have said that the major design goal of SSD-related algorithms is to reduce the influence of the high write latency caused by the erase-before-write restriction. We will then review the following several proposals about query processing algorithms.
+
+In \cite{tsirogiannis2009query}, Graefe et al. focus on the impact of SSD characteristics on query processing in relational databases and especially on join processing. They first demonstrate a column-based layout within each page and show that it can reduce the amount of data read during selections and projections. Then they introduce FlashJoin, which is a general pipelined join algorithm that minimized accesses to base and intermediate relational data. FlashJoin has better performance than a variety of existing binary joins, mainly due to its novel combination of three well-known ideas: using a column-based layout when possible, creating a temporary join index and using late materialization to retrieve the non-join attributes from the fewest possible rows. Then we focus on the details of FlashJoin algorithm. FlashJoin is a multi-way equi-join algorithm, implemented as a pipeline of stylized binary joins, each of which includes a join kernel and a fetch kernel. The join kernel computes the join and outputs a join index, which is used in the fetch kernel to do a late materialization, which only retrieves the needed attributes to compute the next join using RIDs specified in the previous join index. The final fetch kernel retrieves the remaining attributes for the result. The experiments show that FlashJoin significantly reduces memory and I/O requirements for each join in the query and raises the query performance greatly.
+
+\cite{shah2008fast} propose RARE-join algorithm. They convert traditional sequential I/O algorithms to ones that use a mixture of sequential and random I/O to process less data in less time. To make scans and projection faster, they examine a PAX-based page layout \cite{Ailamaki:2001:WRC:645927.672367}, which arranges rows within a page in column-major order. Then they designed the RARE-join (RAndom Read Efficient Join) algorithm for the column-based page layout. RARE-join first constructs a join index and then retrieves only the pages and columns needed for computing the join result. The main idea of RARE-join is very similar to that of the FlashJoin. In \cite{bausch2011performance}, the authors show that many of the results from magnetic HDD-based join methods also hold for flash SSDs. Their results show that in many cases the block nested loops join over sort-merge join and grace hash join works well for SSD and they also propose the idea that simply looking at the I/O costs when designing new flash SSD join algorithms can be problematic, because the CPU cost can be a big part of the total join cost in some cases. Their idea also tells us that we need to do a precise research on the new algorithms design and we need to consider all kinds of costs which can influence the main system performance in different aspects.
+
+
+
+\section{PCM-based Main Memory System.}
+Several recent studies
+from the computer architecture community
+have proposed new memory system designs on PCM.
+They mainly focused on how to make PCM a
+replacement or an addition to the DRAM in the main memory system.
+Although these studies mainly
+focused on the hardware design,
+they provided us the motivation on the
+use of PCM in the new memory hierarchy
+design for database applications.
+
+
+The major disadvantages of the PCM for
+a main memory system are the limited PCM endurance,
+longer access latency and
+higher dynamic power compared to the DRAM.
+There are many relevant studies addressing these
+problems~\cite{qureshi2009scalable,zhou2009durable,lee2009architecting,qureshi2009enhancing}.
+In \cite{qureshi2009scalable},
+Qureshi, Srinivasan and Rivers
+designed a PCM-based hybrid main memory system
+consisting of the PCM storage coupled with
+a small DRAM buffer.
+Such an architecture has both the
+latency benefits of DRAM and the capacity
+benefits of PCM.
+The techniques of partial writes,
+row shifting and segment swapping
+for wear leveling to
+further extend the lifetime of PCM-based
+systems have been proposed to
+reduce redundant bit-writes \cite{zhou2009durable,lee2009architecting}.
+Qureshi et al.~\cite{qureshi2009enhancing}
+proposed the Start-Gap wear-leveling
+technique and analyzed the security
+vulnerabilities caused by the limited write endurance problems.
+Their proposal requires less than 8 bytes of total storage overhead
+and increased the achievable lifetime of the baseline system
+from 5\% to 50\% of the theoretical maximum.
+Zhou et al.~\cite{zhou2009durable} also
+focused on the energy efficiency
+and their results indicated that it is feasible to
+use PCM technology in place of DRAM
+in the main memory for better energy efficiency.
+There are other PCM related studies
+such as,
+\cite{schechter2010use} focusing on
+error corrections,
+and \cite{seong2010security} focusing
+on malicious wear-outs and durability.
+
+Many of the studies in computer architecture community focus on the lifetime issue of PCM 
+technology which is in a lower level consideration. This is the reason why we do not focus
+on the wear out problem in our proposal. This issue should be addressed in the PCM driver level
+and what we want to do is about the upper level database system algorithms. 
+
+\section{Prediction Model}
+In this section, we will review the traditional prediction model based on the histogram since we need an
+accurate prediction model in our proposal for indexing algorithms.
+
+Prediction has always been an extremely important activity and it is an important research topic in statistical
+theory and it is a big business. The basic idea of prediction is to predict the future value or distribution
+of a random variable (RV). The probability distributions of many RVs encountered in practice are subject to
+changes over time and thus it is well known that the fundamental goal of predicting is actually to update the
+probability distribution based on the present and past information.
+
+Traditionally, we use histogram to represent the distribution of a random variable. We divide the observed range
+of variation of the RV into a number of value intervals and the relative frequency of each interval is defined
+to be the proportion of observed values of the RV that lie in that interval. We define the relative frequency in
+each value interval $I_i$ is the estimate of the probability $p_i$ that the RV lies in that interval.
+
+Let $I_1, ..., I_n$ be the value intervals with $u_1, ..., u_n$ as their midpoints and $p=(p_1, ..., p_n)$ is the
+probability vector of the distribution of RV. Then we can get $\overline{\mu}$ and $\overline{\sigma}$ as the estimates of
+expected value $\mu$ and standard deviation of the RV.
+
+\begin{equation}\label{eq:muandsigma}
+    \overline{\mu}=\sum\limits_{i=1}^n u_ip_i , \overline{\sigma}=\sqrt{\sum\limits_{i=1}^n p_i(u_i-u)^2}
+\end{equation}
+
+Then we can define the most commonly used probability distribution in decision making, the normal distribution. It is
+completely specified by the above two parameters. It is symmetric around the mean and the probabilities corresponding
+to the intervals $[\mu-\sigma, \mu+\sigma]$, $[\mu-2\sigma, \mu+2\sigma]$, $[\mu-3\sigma, \mu+3\sigma]$ are 0.68, 0.95, 0.997 respectively.
+
+In our prediction model in practice, the probability distributions of RVs may change with time. For example, the distribution
+of the values inserted into the $B^+$-tree may change with time. We want to capture all the dynamic changes occurring
+in the shapes of probability distributions from time to time and the traditional method is not adequate anymore.
+
+In \cite{murty2002histogram}, Murty proposes to represent probability distribution by the traditional distributions to make
+all changes possible. When updating the distribution of RV, we can change the values of any $p_i$ which makes it
+possible to capture any change in the shape of the distribution. In their model, in addition to the present distribution vector
+$p_1, ..., p_n$, they add the recent histogram $f_1, ..., f_n$ and the updated distribution $x_1, ..., x_n$.
+
+$f=(f_1, ..., f_n)$ represents the estimate of the probability vector in the recent histogram, but it is based on
+the most recent few observations (for example 50). $p=(p_1, ..., p_n)$ is the probability vector in the traditional distribution
+at the previous updating. $x=(x_1, ..., x_n)$ is the updated probability vector which can be obtained by incorporating
+the changing trend reflected in $f$ into $p$. In \cite{murty2000supply}, the authors proposed to compute $x$ from $p$ and $f$ using
+the following formula.
+
+\begin{equation}\label{eq:updatedistribution}
+    x=\beta p+(1-\beta)f
+\end{equation}
+
+In equation \ref{eq:updatedistribution}, $\beta$ is a weight between 0 and 1 and they found that $\beta=$0.8 or 0.9 works well for the model.
+
+We can find that the basic idea of Murty's proposal is to combine the latest change trend of the data distribution into the
+current distribution to better predict the future distribution. Since they will keep updating the trend vector, the prediction
+will keep changing based on the current distribution changing trend which makes the prediction more accurate. Their work may be
+helpful to our prediction model to predict the future inserted values into the $B^+$-tree.
+
+
+\section{Summary}
+
+In this chapter, we did a comprehensive literature review on the related topics to our problem. Since we want to design a write-optimized 
+indexing technique, we first reviewed some of the existing write-optimized indexing techniques for other memory technologies based database systems. 
+Then we reviewed the typical query processing algorithms which can be useful for our future work. After that, we talked about the recent 
+research proposals on the PCM-based memory systems design. We have the similar challenges but we are doing the job on a different level and thus our
+major focus is a bit different. But some of the basic ideas coming from the computer architecture community can also be used by our design. Lastly, 
+we did a brief review about prediction model since we need to use a prediction model to predict the future database distributions in our design. 
+
+\newpage

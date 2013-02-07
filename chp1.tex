@@ -1,0 +1,142 @@
+\chapter{Introduction}
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\label{sec:intro}
+In the established memory technologies hierarchy, DRAMs and flash memories are two major types 
+that are currently in use, but both of them suffer from various shortcomings:
+DRAMs are volatile and flash memories exhibit limited write endurance
+and low write speed. In recent years, we found that 
+the emerging next-generation non-volatile memory (NVM)
+is a promising alternative to the traditional flash memory and DRAM
+as it offers a combination of some of the best features of both types of traditional memory technologies. 
+In the near future NVM is expected to become a common component of the memory and storage
+technology hierarchy for PCs and servers \cite{Condit:2009:BIT:1629575.1629589,lee2009architecting,qureshi2009scalable}. 
+
+In this thesis, we 
+will research on how to make the emerging next-generation non-volatile memory adaptive to the existing 
+memory system hierarchy. In particular, we will focus on how to make the traditional database systems work
+efficiently on the NVM-based memory systems. The problem becomes how should the traditional database systems
+be modified to best make use of the NVM? This thesis is an initial research on this topic and we will present 
+our design for the indexing technique. In the future, we can continue to work on redesigning many other components 
+in database systems including query processing, buffer management and transaction management etc. 
+
+%\emph{Phase change memory} (PCM) is a promising memory technology which offers a combination of some of the best features of DRAM and NAND flash. Like DRAM, PCM is byte addressable and supports random access. However, PCM is non-volatile and offers superior density relative to DRAM and thus provides a much larger capacity within the same budget~\cite{qureshi2009scalable}. Compared to NAND flash, PCM offers a better read and write latency, endurance and consumes less energy. Therefore, PCM can be seen as a middleware between DRAM and NAND flash based on these features, and it will have a big impact on the memory hierarchy.
+%Recently, there has been several studies proposals focusing on the effect of PCM on the memory hierarchy \cite{doller2009} and some about how to integrate PCM into the memory hierarchy \cite{lee2009architecting}\cite{qureshi2009scalable}. Most of them consider PCM as a replacement of the current DRAM-based main memory. In \cite{qureshi2009scalable}, the authors present that a well-designed PCM-based hybrid main memory system can achieve both the latency benefits of DRAM and the capacity benefits of PCM, with the aid of a small DRAM buffer. These proposals focus on the architecture level design of the computer system.
+%In this paper we focus on the indexing techniques for database systems on NVM-based hybrid main memory system
+
+%\section{NVM Technology}
+
+There are some widely pursued NVM technologies: magneto-resistive random
+access memory (MRAM),
+ferroelectric random access memories (FeRAM), resistive random access memory (RRAM),spin-transfer torque memory (STT-RAM),
+and phase change memory (PCM)\cite{muller2003emerging} and in this thesis, we will focus on PCM technology since it is at a more advanced stage of development and our algorithms can be adapted to other similar memory technologies. We know that there are some differences among the different kinds of NVM technologies, but in the remainder of this thesis, we will use PCM and NVM interchangeably for simplicity and mainly focus on the PCM technology.
+
+
+Like DRAM, PCM is byte addressable
+and supports random accesses.
+However, PCM is non-volatile and offers superior density to DRAM and
+thus provides a much larger capacity within the same budget~\cite{qureshi2009scalable}.
+Compared to NAND flash,
+PCM offers better read and write latency,
+better endurance and lower energy consumption.
+Based on these features, PCM can be seen as a form of middleware between DRAM
+and NAND flash, and we can expect it to have a big impact on the memory hierarchy.
+Due to its attractive attributes, PCM
+has been considered a feasible device for
+database systems \cite{qureshi2009scalable,chen2011rethinking}.
+In this thesis, we focus on designing indexing techniques in PCM-based
+hybrid main memory systems, since indexing will greatly influence the efficiency of the traditional
+database systems.
+%In this paper, we focus on designing indexing techniques in PCM-based hybrid main memory systems
+%since the indexing mechanism remains the primary access method for efficient location of data.
+
+%Existing indexing techniques cannot be directly used in PCM efficiently and
+There are several main challenges in designing new algorithms for PCM.
+First, though PCM is faster than NAND flash,
+it is still much slower than DRAM,
+especially the write function,
+which greatly affects system performance.
+Second, the PCM device consumes
+more energy because of the phase change of the
+material. We will elaborate on this point in
+Chapter~\ref{sec:technology}.
+Third, compared to DRAM,
+the lifetime of PCM is shorter, which may limit the
+usefulness of PCM for commercial systems.
+However, as mentioned in \cite{qureshi2009scalable,chen2011rethinking},
+some measures could be taken to reduce write traffic
+as a means to extend the overall lifetime. This, however, may require substantial redesigning
+of the whole database system.
+In general,
+the longer access latency and the
+higher energy consumption are the major factors that affect the
+performance of PCM-based memory systems.
+%%%%al: something is missing in the above sentence.
+%Moreover, the latency of writes is much longer than that of reads.
+
+%A few competing NVM technologies such as PCM and RRAM (resistive random-access memory)
+%share certain features although PCM seems to be at the more advanced stage of large
+%scale production for the market.
+%We therefore use PCM as the NVM chip for the hybrid-memory system.
+%Our techniques can be easily extended or adapted to support
+%other NVM memories with similar features: non-volatile, byte addressable, high read speed and relatively low write speed.
+%%% weiwei: checked. changed to "relatively slow", since our objective is to reduce writes I don't think we can say "high write speed" here, this is different from the abstract
+%%%% ooibc: low write speed?
+
+\section{Our Contributions}
+
+In this thesis,
+we propose the predictive \bplustree (called \bptree),
+an adaptive indexing structure for PCM-based memory.
+Our main objective is to devise new algorithms to reduce
+the number of writes without sacrificing the search efficiency.
+Our \bptree is able to achieve much higher overall system performance
+than the classical \bplustree in the PCM-based systems.
+To the best of our knowledge, no paper has addressed the issue in such
+detail and thoroughness.
+To summarize, we make the following contributions:
+
+\begin{enumerate}
+  \item We first look into the technology details of the next generation non-volatile memory technology and then we conduct a comprehensive literature review about the indexing design in the traditional database systems which can contribute to our redesign. We also showed the algorithms design consideration for the NVM-based systems. 
+
+  \item We propose a new predictive \bplustree index, called the \bptree,
+  which is designed to accommodate the features of the PCM chip to allow it to
+  work efficiently in PCM-based main memory systems.
+  The \bptree can significantly reduce both
+  number of writes and energy consumption.
+
+  %\item We provide some basic ideas about the query processing algorithms adaptive to the PCM-based database systems, which can be a direction of the future research work.
+
+  \item We implemented the \bptree 
+  in the open source database system PostgreSQL\footnote{http://www.postgresql.org/}, and run it in an emulated environment. Via these experiments, we will show that our new \bptree index significantly outperforms the typical \bplustree
+  in terms of insertion and search performance and energy consumption.
+\end{enumerate}
+
+\section{Outline of The Thesis}
+
+The remainder of the thesis is organized as follows:
+
+\begin{itemize}
+  \item Chapter~\ref{sec:technology} introduces the next generation non-volatile memory technology. We provides the technical specifications of some NVM technology and do a comparison between the existing memory technologies and NVM. Based on the understanding of the technical specifications, we present our consideration about how to design adaptive algorithms for NVM-based database systems. 
+
+  \item Chapter~\ref{sec:rw} reviews the existing related work. In this chapter, we did a comprehensive literature review about the write optimized tree indexing and the existing redesigning work of the NVM-based memory systems. Besides, we also reviewed the existing proposals about the query processing techniques which can be referenced in our future work. 
+
+  \item Chapter~\ref{sec:pbtree} presents the \bptree. In this chapter, we propose the main design of \bptree. We talked about the major structure of the tree and gave the algorithms about how to insert and search keys on our \bptree.  
+      
+  \item Chapter~\ref{sec:model} presents a \predict model to perform the predicting of future data distribution. In the previous chapter, we have present that we need a \predict model to predict the future data distribution and in this chapter, we present the details of our \predict model and show how to integrate the \predict model into our \bptree.
+
+  \item Chapter~\ref{sec:experiment} presents the experimental evaluation. In this chapter, we did various experiments in our simulation environment and showed that our \bptree reduces both execution time and energy consumption.
+  
+  \item Chapter~\ref{sec:conclusion} concludes the paper and provide a future research direction. In this chapter, we concluded our work on the indexing technique and gave some direction of the future work. We can continue to work on many other components of database systems including query processing, buffer management and transaction management etc. 
+\end{itemize}
+
+%In Section~\ref{sec:qp}, we will provide some basic idea of our rethinking of the query processing algorithms for PCM-based database systems.
+
+\newpage
+%\section{Background and Related Work}
+%\label{sec:background}
+
+%In this section, we first introduce some background
+%knowledge including the details on the PCM technology.
+%Then we will review some previous work on the design of
+%database algorithms for new memory hierarchy.
